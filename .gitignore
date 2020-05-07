@@ -9,6 +9,7 @@
 */[Bb]uilds/
 */[Ll]ogs/
 */[Mm]emoryCaptures/
+*Artifacts
 
 # Never ignore Asset meta data
 !/[Aa]ssets/**/*.meta
@@ -56,3 +57,11 @@
 # Crashlytics generated file
 *crashlytics-build.properties
 
+Boids/Library/Artifacts/08/08db5a2c5516dab558e2241be0e6df47
+Boids/Library/Artifacts/08/08db5a2c5516dab558e2241be0e6df47
+Boids/Library/Artifacts/0a/0aa79be70d33ac9380db6c10357aa2ec
+Boids/Library/Artifacts/0c/0c0c26cd5bf854f38239b43e586075d4
+Boids/Library/Artifacts/0d/0d1c5e0965abad80c47e2ed4f571f2d0
+Boids/Library/Artifacts/0e/0e84e0252901ee1509f44266213bd430
+Boids/Library/Artifacts/0f/0f4d4aa61afd35234baed81c73009e86
+Boids/Library/Artifacts/0f/0f5fdf149eeb2f1be8026ca219e5ee2b
