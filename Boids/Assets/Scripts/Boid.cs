@@ -123,7 +123,7 @@ public class Boid : MonoBehaviour
         foreach (var boid in boids)
         {
             //Debug.Log(boid.gameObject.name);
-            if (boid.gameObject.name.Contains("BoidPrefab"))
+            if (boid.gameObject.name.Contains("Boid"))
             {
                 myBoids.Add(boid);
             }

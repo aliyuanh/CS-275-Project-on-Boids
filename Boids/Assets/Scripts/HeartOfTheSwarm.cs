@@ -6,6 +6,7 @@ public class HeartOfTheSwarm : MonoBehaviour
 {
     // Start is called before the first frame update
     public Transform boidPrefab;
+    public GameObject CameraController;
     public int swarmCount;
     private int maxDistance = 45;
     private Vector3 origin;
@@ -16,8 +17,9 @@ public class HeartOfTheSwarm : MonoBehaviour
         {
             var myBoid = Instantiate(boidPrefab, origin + Random.insideUnitSphere * maxDistance, Quaternion.identity);
             myBoid.gameObject.GetComponent<Boid>().origin = origin;
-            Debug.Log(transform.position);
+            myBoid.name = "Boid" + i.ToString();
         }
+        Instantiate(CameraController, origin, Quaternion.identity);
     }
 
     // Update is called once per frame
