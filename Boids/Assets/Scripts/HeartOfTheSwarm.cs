@@ -4,12 +4,14 @@ using UnityEngine;
 
 public class HeartOfTheSwarm : MonoBehaviour
 {
-    // Start is called before the first frame update
     public Transform boidPrefab;
     public GameObject CameraController;
     public int swarmCount;
     private int maxDistance = 45;
     private Vector3 origin;
+
+    //create boids (of # swarmCount) in a sphere randomly relative to the origin. 
+    //also, create the camera controller. 
     void Start()
     {
         origin = transform.position;
@@ -22,9 +24,4 @@ public class HeartOfTheSwarm : MonoBehaviour
         Instantiate(CameraController, origin, Quaternion.identity);
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
 }

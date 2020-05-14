@@ -20,9 +20,14 @@ public class Boid : MonoBehaviour
     public Vector3 origin;
     private void Start()
     {
+        //calculate a new velocity every tenth of a second. 
         InvokeRepeating("CalculateVelocity", .01f, .1f);
         Debug.Log(origin);
     }
+
+    // calculate the difference between other boids and this boid. 
+    // move towards the rest of the swarm if it's within the cohesion radius
+    // clamp the speed so no boid accelerates too fast 
     Vector3 CalculateCohesion(List<Collider> boids)
     {
         Vector3 currCohesion = Vector3.zero;
@@ -44,6 +49,10 @@ public class Boid : MonoBehaviour
         return Vector3.ClampMagnitude(currCohesion, maxSpeed);
 
     }
+
+    //makes sure boids don't collide with each other
+    //if any other boids are closer to the boid than separationDistance, they're too close. 
+    //fly away from them! 
     Vector3 CalculateSeparation(List<Collider> boids)
     {
         Vector3 currSep = Vector3.zero;
@@ -59,6 +68,10 @@ public class Boid : MonoBehaviour
         }
         return -currSep;
     }
+
+    //boids will try to go at ~the same speed as each other
+    //find all the boids in your swarm and try to match their velocity
+    //clamp speed so no boids can go above max speed   
     Vector3 CalculateAlignment(List<Collider> boids)
     {
         Vector3 currAlign = Vector3.zero;
@@ -78,6 +91,14 @@ public class Boid : MonoBehaviour
         }
         return Vector3.ClampMagnitude(currAlign, maxSpeed);
     }
+    //ok this doesn't work properly but it kind of works? 
+    //find all gameobjects within a large radius (cohesion radius * 2)
+    //if the gameobject has the tag "food", make a food ray from me to food
+    //note: later, this vector will be given by CV 
+    //find the angle between my current rotation and food
+    //if the food is closer than some angle (60 degrees) then it's viewable in the FOV
+    //set the food vector only if it's viewable and return it 
+    //if no food is found, return 0
     Vector3 findFood()
     {
         Vector3 myVelocity = transform.eulerAngles;
@@ -87,15 +108,15 @@ public class Boid : MonoBehaviour
         {
             if (thing.gameObject.tag.Contains("Food"))
             {
-                Debug.Log("Food in sphere!!!");
+                //Debug.Log("Food in sphere!!!");
                 //calculate angle to see if in FOV
                 Vector3 targetDir = thing.transform.position - transform.position;
                 float angle = Vector3.Angle(myVelocity, targetDir);
                 angle = System.Math.Abs(angle);
-                Debug.Log(angle);
+               // Debug.Log(angle);
                 if (angle < 60)
                 {
-                    Debug.Log("found food in FOV!");
+                    //Debug.Log("found food in FOV!");
                     Vector3 toFood = thing.transform.position - transform.position;
                     if (toFood.magnitude < foodVec.magnitude)
                     {
@@ -110,6 +131,7 @@ public class Boid : MonoBehaviour
         }
         return foodVec;
     }
+    //calculate velocity based on the rules of cohesion, separation, and alignment 
     void CalculateVelocity()
     {
         toFood = findFood();
@@ -118,36 +140,45 @@ public class Boid : MonoBehaviour
         separation = Vector3.zero;
         separationCount = 0;
         alignment = Vector3.zero;
+        //only consider boids that are near me
         boids = Physics.OverlapSphere(transform.position, cohesionRadius);
         List<Collider> myBoids = new List<Collider>();
+        //only collect boids
         foreach (var boid in boids)
         {
-            //Debug.Log(boid.gameObject.name);
             if (boid.gameObject.name.Contains("Boid"))
             {
                 myBoids.Add(boid);
             }
         }
         cohesion = CalculateCohesion(myBoids);
-        // Debug.Log(cohesion);
         separation = CalculateSeparation(myBoids);
         alignment = CalculateAlignment(myBoids);
+        //this equation sets the velocity with different weights given to cohesion, separation, alignment, and food
+        //note: changing the weight of any of these vectors will change the speed + behavior of the boids
         velocity = cohesion * .2f + separation + alignment * 1.2f + toFood * .3f;
     }
 
+    //move every frame, restricting the boids to a sphere around their origin
     void Update()
     {
+        //boids only move quickly when they are inside a sphere near the origin. 
+        //if they move out of the sphere, they will slow down + rotate to be in the sphere
         if ((transform.position - origin).magnitude > maxDistance)
         {
             velocity += -transform.position.normalized * 5;
         }
         transform.position += velocity * Time.deltaTime;
+        //NOTE: this rotation line turns the boids to match their velocity vector.
+        //for some reason, adding the food vector broke this (fix later!)
+
         //transform.rotation = Quaternion.LookRotation(velocity);
 
-        Debug.DrawRay(transform.position, alignment, Color.blue);
-        Debug.DrawRay(transform.position, separation, Color.green);
-        Debug.DrawRay(transform.position, cohesion, Color.magenta);
-        Debug.DrawRay(transform.position, velocity, Color.yellow);
-        Debug.DrawRay(transform.position, toFood, Color.cyan);
+        //draw rays of each important vector to each boid. 
+        //Debug.DrawRay(transform.position, alignment, Color.blue);
+        //Debug.DrawRay(transform.position, separation, Color.green);
+        //Debug.DrawRay(transform.position, cohesion, Color.magenta);
+        //Debug.DrawRay(transform.position, velocity, Color.yellow);
+        //Debug.DrawRay(transform.position, toFood, Color.cyan);
     }
 }
