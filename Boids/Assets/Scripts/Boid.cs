@@ -18,11 +18,12 @@ public class Boid : MonoBehaviour
     private float maxSpeed = 15;
     private float maxDistance = 45;
     public Vector3 origin;
+
     private void Start()
     {
         //calculate a new velocity every tenth of a second. 
         InvokeRepeating("CalculateVelocity", .01f, .1f);
-        Debug.Log(origin);
+        //Debug.Log(origin);
     }
 
     // calculate the difference between other boids and this boid. 

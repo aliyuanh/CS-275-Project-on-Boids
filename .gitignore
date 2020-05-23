@@ -54,6 +54,9 @@
 *.apk
 *.unitypackage
 
+./CV/__pycache__
+__pycache__
+
 # Crashlytics generated file
 *crashlytics-build.properties
 
