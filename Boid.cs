@@ -6,7 +6,6 @@ using UnityEngine.UIElements;
 public class Boid : MonoBehaviour
 {
     public Vector3 velocity;
-
     private float cohesionRadius = 15;
     private float separationDistance = 6;
     private Collider[] boids;
@@ -121,7 +120,7 @@ public class Boid : MonoBehaviour
         Vector3 PredatorsVec = new Vector3(1000, 1000, 1000);
         foreach (var thing in Predators)
         {
-            if (thing.gameObject.tag.Contains("Predator"))
+            if (thing.gameObject.tag.Contains("Obstacle"))
             {
                 Debug.Log("Predators in sphere!!!");
                 //calculate angle to see if in FOV
@@ -132,7 +131,7 @@ public class Boid : MonoBehaviour
                 if (angle < 60)
                 {
                     Debug.Log("found predators in FOV!");
-                    Vector3 toPredator = thing.transform.position - transform.position;
+                    Vector3 toObstacle = thing.transform.position - transform.position;
                     if (toPredator.magnitude < PredatorsVec.magnitude)
                     {
                         PredatorsVec = -toPredator;
@@ -148,6 +147,81 @@ public class Boid : MonoBehaviour
         return PredatorsVec;
     }
 
+    float RotateAngles(float Angles) //helper func for turning 
+    {
+        float angles = 0;
+        if (Angles >= 0)
+        {
+            angles = Angles - ((int)(Angles / 360)) * 360;
+        }
+        else
+        {
+            angles = (((int)(Angles / 360)) + 1) * 360 - Angles;
+        }
+        return angles;
+    }
+
+    float RandomM1T1() //generate random -1 to 1
+    {
+        float index = Random.Range(-1, 1);
+        if (index == 0)
+        {
+            index = RandomM1T1();
+        }
+        return index;
+    }
+
+    //Please use the computer vision part to get where the obstacle is
+    private bool IsForward = false; //Need these four to determine whether to turn and where to turn
+    private bool IsInLeft = false; 
+    private bool IsInRight = false; 
+    private bool IsObstacle = false;
+
+    private Vector3 pos;// = transform.localEulerAngles;     update this on detection of obstacle
+
+    
+    Vector3 avoidObstacle()
+    {
+        if (IsForward)
+        {
+            if (IsInLeft && !IsInRight)
+            {
+                float rotateAnglesY = RotateAngles(pos.y + 90);
+                transform.localEulerAngles = new Vector3(transform.localEulerAngles.x,rotateAnglesY,transform.localEulerAngles.z);
+            }
+            else if (!IsInLeft && IsInRight)
+            {
+                float rotateAnglesY = RotateAngles(pos.y - 90);
+                transform.localEulerAngles = new Vector3(transform.localEulerAngles.x,rotateAnglesY,transform.localEulerAngles.z);
+            }
+            else if (IsInLeft && IsInRight)
+            {
+                float rotateAnglesY = RotateAngles(pos.y + 180);
+                transform.localEulerAngles = new Vector3(transform.localEulerAngles.x,rotateAnglesY,transform.localEulerAngles.z);
+            }
+            else
+            {
+                float rotateAnglesY = RotateAngles(pos.y + RandomM1T1() * 90);
+                transform.localEulerAngles = new Vector3(transform.localEulerAngles.x,rotateAnglesY,transform.localEulerAngles.z);
+            }
+        }
+        else
+        {
+            if (!IsInLeft && !IsInRight)
+            {
+                if (IsObstacle)
+                {
+                    timer += Time.deltaTime;
+                    if (timer > 0.8f)
+                    {
+                        timer = 0;
+                        IsObstacle = false;
+                    }
+                }
+            }
+        }
+    }
+
     Vector3 landHelp(Vector3 targetPosition)
     {
         Vector3 diff = targetPosition - transform.position;
@@ -158,7 +232,7 @@ public class Boid : MonoBehaviour
         }
         float speed = dist / 1.5f; //adjustable depending on how fast you want to land
         if (speed > maxSpeed) speed = maxSpeed;
-        return diff.normalized * speed - velocity;
+        return diff.normalized * speed - transform.eulerAngles;
     }
 
     Vector3 land()
@@ -240,6 +314,7 @@ public class Boid : MonoBehaviour
         }
         transform.position += velocity * Time.deltaTime;
         //transform.rotation = Quaternion.LookRotation(velocity);
+        //avoidObstacle();
 
         Debug.DrawRay(transform.position, alignment, Color.blue);
         Debug.DrawRay(transform.position, separation, Color.green);
