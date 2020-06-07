@@ -175,10 +175,10 @@ public class Boid : MonoBehaviour
         //transform.rotation = Quaternion.LookRotation(velocity);
 
         //draw rays of each important vector to each boid. 
-        //Debug.DrawRay(transform.position, alignment, Color.blue);
-        //Debug.DrawRay(transform.position, separation, Color.green);
-        //Debug.DrawRay(transform.position, cohesion, Color.magenta);
-        //Debug.DrawRay(transform.position, velocity, Color.yellow);
-        //Debug.DrawRay(transform.position, toFood, Color.cyan);
+        Debug.DrawRay(transform.position, alignment, Color.blue);
+        Debug.DrawRay(transform.position, separation, Color.green);
+        Debug.DrawRay(transform.position, cohesion, Color.magenta);
+        Debug.DrawRay(transform.position, velocity, Color.yellow);
+        Debug.DrawRay(transform.position, toFood, Color.cyan);
     }
 }
