@@ -33,6 +33,7 @@ public class Boid : MonoBehaviour
     {
         timeSincePerch = 10f;
         landing = false;
+        toFood = Vector3.zero;
         perching = false;
         timeUntilTired = UnityEngine.Random.Range(15f, 75f);
         objectsInScene = new List<(string name, Vector3 ray)>();
@@ -129,28 +130,43 @@ public class Boid : MonoBehaviour
         return foodVec;
     }
 
-    void ParseCV(List<(string name, Vector3 ray)> inputs)
+    //call this function in order to set the food and obstacle vectors from the CV pipeline 
+    public void ParseCV(List<(string name, Vector3 ray)> inputs)
     {
+        bool foodChanged = false;
+        bool obstacleChanged = false;
         foreach(var p in inputs)
         {
-            Vector3 relativeVector = transform.up * p.ray.y + -transform.right * p.ray.x + transform.forward * p.ray.z;
+            //I am not completely sure these match up b/c I can't test them 
+            Vector3 relativeVector = transform.up * p.ray.y + transform.right * p.ray.x + transform.forward * p.ray.z;
             //if food, set food stuff
             if (p.name == "cake" || p.name == "donut")
             {
                 //set food vector to RELATIVE vector using up/left/right vectors
                 toFood = relativeVector;
+                foodChanged = true;
             }
             else
             {
                 //if it's not food, avoid the obstacle!
                 Vector3 avoid = velocity - relativeVector;
                 avoidObstacle = avoid;
+                obstacleChanged = true;
             }
+        }
+        //make the toFood and avoidObstacle vectors 0 so they don't affect the velocity. 
+        if (!foodChanged)
+        {
+            toFood = Vector3.zero;
+        }
+        if (!obstacleChanged)
+        {
+            avoidObstacle = Vector3.zero;
         }
     }
     void CalculateVelocity()
     {
-        toFood = findFood();
+        //toFood = findFood();
         velocity = Vector3.zero;
         cohesion = Vector3.zero;
         separation = Vector3.zero;
@@ -166,37 +182,38 @@ public class Boid : MonoBehaviour
             }
         }
         cohesion = CalculateCohesion(myBoids);
-        // Debug.Log(cohesion);
         separation = CalculateSeparation(myBoids);
         alignment = CalculateAlignment(myBoids);
+        //up vector ensures that the boid flies upwards after perching. 
         Vector3 upVec = new Vector3(0,1,0);
-        velocity = cohesion * .2f + separation + alignment * 1.7f+ toFood * .3f + upVec;
+        velocity = cohesion * .2f + separation + alignment * 1.7f+ toFood * .3f + avoidObstacle * 1.2f + upVec;
         Vector3 land = LandingVec();
+        //if the boid is landing, ignore the calculated velocity and just use the landing vector. 
         if (landing)
         {
             velocity = land;
-            //Debug.Log(land);
         }
         timeSincePerch += .1f;
 
         //if perching, keep still
         if (perching)
         {
-            // Debug.Log(gameObject.name + " I'm perching!" );
             velocity = Vector3.zero;
+            //if the boid perches for > 5 seconds, fly away! 
             if (timeSincePerch > 5f)
             {
                 perching = false;
             }
         }
+        //constrain velocity here
         velocity = velocity * .8f;
     }
-    //ensure that boids do not go through the ground
+    //ensure that boids do not go through the ground (-24)
     void checkGround()
     {
-        if(transform.position.y < -24)
+        if(transform.position.y < groundHeight)
         {
-            transform.position = new Vector3(transform.position.x, -24, transform.position.z);
+            transform.position = new Vector3(transform.position.x, groundHeight, transform.position.z);
         }
     }
     Vector3 LandingVec()
@@ -209,14 +226,15 @@ public class Boid : MonoBehaviour
         toLand = new Vector3(0, -heightDiff / 3 - 2f, 0);
         if(heightDiff < 1.0f && timeSincePerch > 10f)
         {
+            //start perching if you haven't perched recently and are close to the ground 
             if(perching == false)
             {
                 timeSincePerch = 0;
                 perching = true;
-                Debug.Log("perch!");
             }
             landing = false;
         }
+        //fly downwards, but also slightly along the previous velocity so not flying completely downward. 
         toLand.x = velocity.x / 2;
         toLand.z = velocity.z / 2;
         return toLand;
@@ -230,12 +248,14 @@ public class Boid : MonoBehaviour
         }
         transform.position += velocity * Time.deltaTime;
         checkGround();
+        //ensures that boid gets tired some time within 25 to 100 seconds and starts landing. 
         timeUntilTired -= Time.deltaTime;
         if(timeUntilTired <= 0f)
         {
             timeUntilTired = UnityEngine.Random.Range(25f, 100f);
             landing = true;
         }
+        //fixed -- rotate to be along the velocity vector. Maybe slerp later to make it smoother. 
         transform.rotation = Quaternion.LookRotation(velocity);
 
         //Debug.DrawRay(transform.position, alignment, Color.blue);
