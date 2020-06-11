@@ -31576,9 +31576,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1b0208eac6a21cd4a915d91b8fdef327, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boidPrefab: {fileID: 162375580499392378, guid: 3ff865be5c15b0f48b9f483a7c1d7b6f,
+  boidPrefab: {fileID: 162375580499392379, guid: 3ff865be5c15b0f48b9f483a7c1d7b6f,
     type: 3}
-  swarmCount: 25
+  swarmCount: 5
+  ImageDim: 416
+  SampleFrequency: 0.1
+  URL: http://127.0.0.1:5000/getFromUnity
 --- !u!4 &1893912433
 Transform:
   m_ObjectHideFlags: 0

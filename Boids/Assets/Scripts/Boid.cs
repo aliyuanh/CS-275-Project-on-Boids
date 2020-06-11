@@ -10,6 +10,9 @@ using UnityEngine.UIElements;
 public class Boid : MonoBehaviour
 {
     public Vector3 velocity;
+
+    public Pigeon boidBody;
+
     //TODO: add tireness + landing boolean trigger :D (20s + math.random*30?)
     private float cohesionRadius = 15;
     private float separationDistance = 6;
@@ -23,7 +26,7 @@ public class Boid : MonoBehaviour
     public bool perching;
     public bool landing;
     private float timeSincePerch;
-    private float maxSpeed = 15;
+    private float maxSpeed = 5;
     private float maxDistance = 45;
     private float groundHeight = -24f;
     public float timeUntilTired = 0;
@@ -110,13 +113,13 @@ public class Boid : MonoBehaviour
                 float angle = Vector3.Angle(myVelocity, targetDir);
                 angle = System.Math.Abs(angle);
                 Debug.Log(angle);
-                    Vector3 toFood = thing.transform.position - transform.position;
-                    if (toFood.magnitude < foodVec.magnitude)
-                    {
-                        foodVec = toFood;
-                    }
-                
-                if((transform.position - thing.transform.position).magnitude < 4f)
+                Vector3 toFood = thing.transform.position - transform.position;
+                if (toFood.magnitude < foodVec.magnitude)
+                {
+                    foodVec = toFood;
+                }
+
+                if ((transform.position - thing.transform.position).magnitude < 4f)
                 {
                     FoodScript food = thing.GetComponent<FoodScript>();
                     food.getPecked();
@@ -135,7 +138,7 @@ public class Boid : MonoBehaviour
     {
         bool foodChanged = false;
         bool obstacleChanged = false;
-        foreach(var p in inputs)
+        foreach (var p in inputs)
         {
             //I am not completely sure these match up b/c I can't test them 
             Vector3 relativeVector = transform.up * p.ray.y + transform.right * p.ray.x + transform.forward * p.ray.z;
@@ -166,7 +169,7 @@ public class Boid : MonoBehaviour
     }
     void CalculateVelocity()
     {
-        //toFood = findFood();
+        // toFood = findFood();
         velocity = Vector3.zero;
         cohesion = Vector3.zero;
         separation = Vector3.zero;
@@ -185,8 +188,8 @@ public class Boid : MonoBehaviour
         separation = CalculateSeparation(myBoids);
         alignment = CalculateAlignment(myBoids);
         //up vector ensures that the boid flies upwards after perching. 
-        Vector3 upVec = new Vector3(0,1,0);
-        velocity = cohesion * .2f + separation + alignment * 1.7f+ toFood * .3f + avoidObstacle * 1.2f + upVec;
+        Vector3 upVec = new Vector3(0, 1, 0);
+        velocity = cohesion * .2f + separation + alignment * 1.7f + toFood * .3f + avoidObstacle * 1.2f + upVec;
         Vector3 land = LandingVec();
         //if the boid is landing, ignore the calculated velocity and just use the landing vector. 
         if (landing)
@@ -211,7 +214,7 @@ public class Boid : MonoBehaviour
     //ensure that boids do not go through the ground (-24)
     void checkGround()
     {
-        if(transform.position.y < groundHeight)
+        if (transform.position.y < groundHeight)
         {
             transform.position = new Vector3(transform.position.x, groundHeight, transform.position.z);
         }
@@ -224,10 +227,10 @@ public class Boid : MonoBehaviour
         float heightDiff = (transform.position.y - groundHeight);
         //Debug.Log(heightDiff);
         toLand = new Vector3(0, -heightDiff / 3 - 2f, 0);
-        if(heightDiff < 1.0f && timeSincePerch > 10f)
+        if (heightDiff < 1.0f && timeSincePerch > 10f)
         {
             //start perching if you haven't perched recently and are close to the ground 
-            if(perching == false)
+            if (perching == false)
             {
                 timeSincePerch = 0;
                 perching = true;
@@ -250,13 +253,22 @@ public class Boid : MonoBehaviour
         checkGround();
         //ensures that boid gets tired some time within 25 to 100 seconds and starts landing. 
         timeUntilTired -= Time.deltaTime;
-        if(timeUntilTired <= 0f)
+        if (timeUntilTired <= 0f)
         {
             timeUntilTired = UnityEngine.Random.Range(25f, 100f);
             landing = true;
         }
         //fixed -- rotate to be along the velocity vector. Maybe slerp later to make it smoother. 
-        transform.rotation = Quaternion.LookRotation(velocity);
+        if (velocity.magnitude > 0)
+        {
+            transform.rotation = Quaternion.LookRotation(velocity);
+        }
+
+        if (boidBody != null)
+        {
+            boidBody.flapFrequency = Mathf.Clamp(velocity.magnitude, 1.8f, 2.5f);
+            boidBody.tailFrequency = boidBody.flapFrequency * 2.0f / 1.8f;
+        }
 
         //Debug.DrawRay(transform.position, alignment, Color.blue);
         //Debug.DrawRay(transform.position, separation, Color.green);
