@@ -7,6 +7,8 @@ public class Boid : MonoBehaviour
 {
     public Vector3 velocity;
 
+    public Pigeon boidBody;
+
     private float cohesionRadius = 15;
     private float separationDistance = 6;
     private Collider[] boids;
@@ -15,7 +17,7 @@ public class Boid : MonoBehaviour
     private int separationCount;
     private Vector3 alignment;
     private Vector3 toFood;
-    private float maxSpeed = 15;
+    private float maxSpeed = 5;
     private float maxDistance = 45;
     public Vector3 origin;
 
@@ -173,7 +175,11 @@ public class Boid : MonoBehaviour
         //NOTE: this rotation line turns the boids to match their velocity vector.
         //for some reason, adding the food vector broke this (fix later!)
 
-        //transform.rotation = Quaternion.LookRotation(velocity);
+        if (velocity.magnitude > 0)
+            transform.rotation = Quaternion.LookRotation(velocity);
+
+        boidBody.flapFrequency = Mathf.Clamp(velocity.magnitude, 1, 2.5f);
+        boidBody.tailFrequency = boidBody.flapFrequency / 1.8f * 2.0f;
 
         //draw rays of each important vector to each boid. 
         //Debug.DrawRay(transform.position, alignment, Color.blue);

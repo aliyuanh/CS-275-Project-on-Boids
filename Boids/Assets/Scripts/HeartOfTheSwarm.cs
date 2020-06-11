@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System;
 using UnityEngine;
 using BoidVision;
-using Unity.Barracuda;
+//using Unity.Barracuda;
 
 public class HeartOfTheSwarm : MonoBehaviour
 {
@@ -27,7 +27,7 @@ public class HeartOfTheSwarm : MonoBehaviour
     string URL = "http://127.0.0.1:5000/getFromUnity";
 
     List<Tuple<GameObject, Camera, RenderTexture>> boidCamPairs = new List<Tuple<GameObject, Camera, RenderTexture>>();
-    CameraCapture captureManager;
+    //CameraCapture captureManager;
     Camera currentCamera;
     int CameraIndex;
     int PackageIndex;
