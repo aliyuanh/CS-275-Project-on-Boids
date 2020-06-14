@@ -26,6 +26,8 @@ namespace BoidVision
             var resultObj = (BoidVisionClient.ResultJson) value;
 
             writer.WriteStartObject();
+            writer.WritePropertyName("BoidID");
+            serializer.Serialize(writer, resultObj.BoidID);
             writer.WritePropertyName("PackageID");
             serializer.Serialize(writer, resultObj.PackageID);
             writer.WritePropertyName("BoidImages");
@@ -44,6 +46,7 @@ namespace BoidVision
             bool receive_boidImg = false;
             bool receive_boidClass = false;
             bool receive_timestamp = false;
+            bool receive_boidID = false;
 
             while (reader.Read())
             {
@@ -55,6 +58,11 @@ namespace BoidVision
                     continue;
 
                 switch (propertyName) {
+                    case "BoidID":
+                        result.PackageID = serializer.Deserialize<int>(reader);
+                        receive_boidID = true;
+                        break;
+
                     case "PackageID":
                         result.PackageID = serializer.Deserialize<int>(reader);
                         receive_packageID = true;
@@ -80,7 +88,7 @@ namespace BoidVision
                 }
             }
 
-            if (!(receive_timestamp && receive_boidClass && receive_boidImg && receive_packageID))
+            if (!(receive_timestamp && receive_boidClass && receive_boidImg && receive_packageID && receive_boidID))
             {
                 throw new Exception("Invalid ResultJson object");
             }

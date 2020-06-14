@@ -13,6 +13,8 @@ namespace BoidVision
         [Serializable]
         public class VisionJson
         {
+            public int BoidID; // ID of the boid
+
             public int PackageID; // ID of the package to keep track of package sequence
 
             public string BoidImage; // Base64 String of Image
@@ -22,6 +24,9 @@ namespace BoidVision
 
         [Serializable]
         public class ResultJson {
+
+            public int BoidID; // ID of the boid
+
             public int PackageID;
 
             public List<List<float>> BoidImages; // Returning coordinates of boxes for the objects
@@ -40,6 +45,8 @@ namespace BoidVision
             public Vector2 cornerMin; // Bottom left corner of the box relative to size of texture
 
             public Vector2 cornerMax; // Top right corner of the box relative to the size of the texture
+
+            public Ray objectRay; // The ray from the camera viewport casted outwards
 
         }
 
@@ -71,11 +78,21 @@ namespace BoidVision
         [SerializeField]
         Camera boidEyes;
 
+        [SerializeField]
+        Boid actualBoid;
+
+        [SerializeField]
+        TextAsset labelAsset;
+
         // Variables for tracking the boid image sent through the server
         int RecordID;
+        int BoidID;
         int ImageSize;
         RenderTexture rt;
         string url;
+
+        [HideInInspector]
+        public bool CurrCameraActive;
 
         // List to hold all the information stored in the current boid
         [HideInInspector]
@@ -89,6 +106,16 @@ namespace BoidVision
         float scaleFactor;
 
         string[] labels;
+
+        // Dictionary to handle the fact that some objects do not look realistic
+        // For demo purposes, we will only use our computer vision model to detect birds
+        // From experimentation and observation, we realized that our model tends to misclassify birds as kites, airplanes, and umbrellas
+        Dictionary<int, int> ClassLabelDict = new Dictionary<int, int>() {
+            {33, 14},
+            {4, 14},
+            {25, 14},
+            {14, 14},
+        };
 
 
         //collect every boid in the scene + give it a render texture with RGB vals
@@ -107,8 +134,9 @@ namespace BoidVision
             boxOutlineTexture.SetPixel(0, 0, Color.green);
             boxOutlineTexture.Apply();
 
-            string file = (Resources.Load(string.Format("Labels/yolov3_tiny")) as TextAsset).text;
+            string file = labelAsset.text;
             labels = file.Split('\n');
+            CurrCameraActive = false;
         }
 
         /// <summary>
@@ -118,13 +146,14 @@ namespace BoidVision
         /// <param name="SampleFrequency">Frequency by which we sent the images to the server and get a reply</param>
         /// <param name="serverURL">URL for Server</param>
         /// <param name="debug">Determines whether the boxes are drawn on top of the boid</param>
-        public void InitializeBoid(int imgDim, float SampleFrequency, string serverURL, bool debug=false) {
+        public void InitializeBoid(int imgDim, float SampleFrequency, string serverURL, int ID, bool debug=false) {
             ImageSize = imgDim;
+            BoidID = ID;
             rt = new RenderTexture(ImageSize, ImageSize, 24);
             url = serverURL;
             DrawBoxes = debug;
 
-            //InvokeRepeating("UpdateVision", 0.5f, SampleFrequency);
+            InvokeRepeating("UpdateVision", 0.5f, SampleFrequency);
         }
 
         // Update is called once per frame
@@ -137,7 +166,9 @@ namespace BoidVision
         // Draws our Boxes on the GUI
         private void OnGUI()
         {
-            if (DrawBoxes && boidEyes.isActiveAndEnabled && boidEyes.targetTexture == null && boidDetectedObjects != null) {
+            if (DrawBoxes && boidEyes.isActiveAndEnabled && boidEyes.targetTexture == null && boidDetectedObjects.Count > 0 && CurrCameraActive) {
+
+                Debug.Log("BOID " + BoidID + " with ID " + gameObject.GetInstanceID() + " Camera is active and enabled");
 
                 foreach (BoxOutline box in boidDetectedObjects)
                 {
@@ -151,6 +182,7 @@ namespace BoidVision
             CoroutineWithData snapshotHandler = new CoroutineWithData(this, CollectBoidImages(ImageSize));
             VisionJson snapShot = new VisionJson();
             snapShot.PackageID = RecordID;
+            snapShot.BoidID = BoidID;
             snapShot.Timestamp = Time.time;
 
             yield return snapshotHandler.coroutine;
@@ -245,11 +277,29 @@ namespace BoidVision
             for (int i = 0; i < result.BoidImages.Count; i++) {
                 BoxOutline box = new BoxOutline();
                 List<float> boxCoord = result.BoidImages[i];
-                box.cornerMin = new Vector2(boxCoord[0] * scaleFactor + ShiftX, boxCoord[1] * scaleFactor + ShiftY);
-                box.cornerMax = new Vector2(boxCoord[2] * scaleFactor + ShiftX, boxCoord[3] * scaleFactor + ShiftY);
-                box.ClassID = result.BoidClasses[i];
-                boxes.Add(box);
+
+                if (DrawBoxes)
+                {
+                    box.cornerMin = new Vector2(boxCoord[0] * scaleFactor + ShiftX, boxCoord[1] * scaleFactor + ShiftY);
+                    box.cornerMax = new Vector2(boxCoord[2] * scaleFactor + ShiftX, boxCoord[3] * scaleFactor + ShiftY);
+                }
+
+                // Draw the ray by casting viewport point to ray
+                Vector2 boxCenter = new Vector2((boxCoord[0] + boxCoord[2]) / 2.0f, (boxCoord[1] + boxCoord[3]) / 2.0f);
+                boxCenter /= ImageSize;
+                Vector3 temp = new Vector3(boxCenter.x, boxCenter.y, 0.0f);
+                box.objectRay = boidEyes.ViewportPointToRay(temp);
+                //box.cornerMin = new Vector2(boxCoord[0], boxCoord[1]);
+                //box.cornerMax = new Vector3(boxCoord[2], boxCoord[3]);
+
+                if (ClassLabelDict.ContainsKey(result.BoidClasses[i])) {
+                    box.ClassID = ClassLabelDict[result.BoidClasses[i]];
+                    boxes.Add(box);
+                    Debug.Log(gameObject.GetInstanceID() + ": " + "Found class " + labels[box.ClassID]);
+                }
             }
+
+            actualBoid.ParseCV(boxes);
             // DebugBoxes(boxes);
             yield return boxes;
         }

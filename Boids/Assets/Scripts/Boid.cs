@@ -6,14 +6,12 @@ using System.Collections.Generic;
 //using System.Numerics;
 using UnityEngine;
 using UnityEngine.UIElements;
+using BoidVision;
 
 public class Boid : MonoBehaviour
 {
     public Vector3 velocity;
-
     public Pigeon boidBody;
-
-    //TODO: add tireness + landing boolean trigger :D (20s + math.random*30?)
     private float cohesionRadius = 15;
     private float separationDistance = 6;
     private Collider[] boids;
@@ -21,22 +19,36 @@ public class Boid : MonoBehaviour
     private Vector3 separation;
     private Vector3 alignment;
     public Vector3 toFood;
+    public Vector3 seenBoids;
+    public Vector3 avoidPredator;
+    public Vector3 toPheromone;
     public Vector3 avoidObstacle;
     public Vector3 toLand;
     public bool perching;
     public bool landing;
     private float timeSincePerch;
-    private float maxSpeed = 5;
+    private float maxSpeed = 15;
     private float maxDistance = 45;
     private float groundHeight = -24f;
     public float timeUntilTired = 0;
     List<(string name, Vector3 ray)> objectsInScene;
     public Vector3 origin;
+
+
+    // pheromones
+    public BoidPheromoneRelease _pheromonePlacement;
+
+    void Awake()
+    { 
+        // reference to attached release script
+        _pheromonePlacement = GetComponent<BoidPheromoneRelease>();
+    }
     private void Start()
     {
         timeSincePerch = 10f;
         landing = false;
         toFood = Vector3.zero;
+        toPheromone = Vector3.zero;
         perching = false;
         timeUntilTired = UnityEngine.Random.Range(15f, 75f);
         objectsInScene = new List<(string name, Vector3 ray)>();
@@ -98,6 +110,7 @@ public class Boid : MonoBehaviour
         }
         return Vector3.ClampMagnitude(currAlign, maxSpeed);
     }
+
     Vector3 findFood()
     {
         Vector3 myVelocity = transform.eulerAngles;
@@ -113,16 +126,21 @@ public class Boid : MonoBehaviour
                 float angle = Vector3.Angle(myVelocity, targetDir);
                 angle = System.Math.Abs(angle);
                 Debug.Log(angle);
-                Vector3 toFood = thing.transform.position - transform.position;
-                if (toFood.magnitude < foodVec.magnitude)
-                {
-                    foodVec = toFood;
-                }
-
-                if ((transform.position - thing.transform.position).magnitude < 4f)
+                    Vector3 toFood = thing.transform.position - transform.position;
+                    if (toFood.magnitude < foodVec.magnitude)
+                    {
+                        foodVec = toFood;
+                    }
+                
+                if((transform.position - thing.transform.position).magnitude < 4f)
                 {
                     FoodScript food = thing.GetComponent<FoodScript>();
                     food.getPecked();
+                    // release food pheromones when food is found
+                    // tell release script that it can release pheromone
+                    _pheromonePlacement.SetCanReleasePheromone(true);
+                    Debug.Log("Food: set can release true");
+                    _pheromonePlacement.SetPheromoneType(PheromoneTypes.Food);
                 }
             }
         }
@@ -133,43 +151,70 @@ public class Boid : MonoBehaviour
         return foodVec;
     }
 
-    //call this function in order to set the food and obstacle vectors from the CV pipeline 
-    public void ParseCV(List<(string name, Vector3 ray)> inputs)
+    Vector3 avoidPredators()
     {
-        bool foodChanged = false;
-        bool obstacleChanged = false;
-        foreach (var p in inputs)
+        Vector3 myVelocity = transform.eulerAngles;
+        Collider[] possiblePredators = Physics.OverlapSphere(transform.position, cohesionRadius * 2);
+        Vector3 predVec = Vector3.zero;
+
+        if (possiblePredators == null || possiblePredators.Length == 0)
+            return predVec;
+
+        foreach (var thing in possiblePredators)
         {
-            //I am not completely sure these match up b/c I can't test them 
-            Vector3 relativeVector = transform.up * p.ray.y + transform.right * p.ray.x + transform.forward * p.ray.z;
-            //if food, set food stuff
-            if (p.name == "cake" || p.name == "donut")
+            if (thing.gameObject.tag.Contains("Predator"))
             {
-                //set food vector to RELATIVE vector using up/left/right vectors
-                toFood = relativeVector;
-                foodChanged = true;
+                Debug.Log("Predator in sphere!!!");
+                //calculate angle to see if in FOV
+                Vector3 targetDir = transform.position - thing.transform.position;
+                predVec += targetDir.normalized / targetDir.magnitude * 10f;
+
+                // If the predator is within a certain radius, we begin releasing fear pheromones
+                if (targetDir.magnitude < 10f)
+                {
+                    // release food pheromones when food is found
+                    // tell release script that it can release pheromone
+                    _pheromonePlacement.SetCanReleasePheromone(true);
+                    Debug.Log("Fear: set can release true");
+                    _pheromonePlacement.SetPheromoneType(PheromoneTypes.Fear);
+                }
             }
-            else
-            {
-                //if it's not food, avoid the obstacle!
-                Vector3 avoid = velocity - relativeVector;
-                avoidObstacle = avoid;
-                obstacleChanged = true;
-            }
         }
-        //make the toFood and avoidObstacle vectors 0 so they don't affect the velocity. 
-        if (!foodChanged)
-        {
-            toFood = Vector3.zero;
-        }
-        if (!obstacleChanged)
-        {
-            avoidObstacle = Vector3.zero;
-        }
+
+        //predVec /= possiblePredators.Length;
+
+        return predVec;
     }
+
+    /// <summary>
+    /// Called by BoidVisionClient to pass detected objects as inputs
+    /// </summary>
+    /// <param name="inputs"></param>
+    public void ParseCV(List<BoidVisionClient.BoxOutline> inputs)
+    {
+        seenBoids = Vector3.zero;
+
+        if (inputs == null || inputs.Count == 0)
+            return;
+
+        foreach(var p in inputs)
+        {
+            Vector3 ray = p.objectRay.direction;
+            seenBoids += ray.normalized / ray.magnitude * 10f;
+        }
+
+        seenBoids /= inputs.Count;
+    }
+    /// <summary>
+    /// Helper function that is used to calculate the velocity of the boids
+    /// </summary>
     void CalculateVelocity()
     {
-        // toFood = findFood();
+        toFood = findFood();
+        avoidPredator = avoidPredators();
+        // calculated and set in boid pheromone perception script
+        // weight included
+        toPheromone = toPheromone;
         velocity = Vector3.zero;
         cohesion = Vector3.zero;
         separation = Vector3.zero;
@@ -188,8 +233,8 @@ public class Boid : MonoBehaviour
         separation = CalculateSeparation(myBoids);
         alignment = CalculateAlignment(myBoids);
         //up vector ensures that the boid flies upwards after perching. 
-        Vector3 upVec = new Vector3(0, 1, 0);
-        velocity = cohesion * .2f + separation + alignment * 1.7f + toFood * .3f + avoidObstacle * 1.2f + upVec;
+        Vector3 upVec = new Vector3(0,1,0);
+        velocity = cohesion * .2f + separation + alignment * 1.7f + toFood * .3f + toPheromone + avoidPredator * .2f + upVec + seenBoids * 1.5f;
         Vector3 land = LandingVec();
         //if the boid is landing, ignore the calculated velocity and just use the landing vector. 
         if (landing)
@@ -214,11 +259,16 @@ public class Boid : MonoBehaviour
     //ensure that boids do not go through the ground (-24)
     void checkGround()
     {
-        if (transform.position.y < groundHeight)
+        if(transform.position.y < groundHeight)
         {
             transform.position = new Vector3(transform.position.x, groundHeight, transform.position.z);
         }
     }
+
+    /// <summary>
+    /// Used to calculate the vector for directing the boid to the ground (for landing)
+    /// </summary>
+    /// <returns></returns>
     Vector3 LandingVec()
     {
         //check if close to groundHeight and velocity pointing downwards
@@ -227,10 +277,10 @@ public class Boid : MonoBehaviour
         float heightDiff = (transform.position.y - groundHeight);
         //Debug.Log(heightDiff);
         toLand = new Vector3(0, -heightDiff / 3 - 2f, 0);
-        if (heightDiff < 1.0f && timeSincePerch > 10f)
+        if(heightDiff < 1.0f && timeSincePerch > 20f)
         {
             //start perching if you haven't perched recently and are close to the ground 
-            if (perching == false)
+            if(perching == false)
             {
                 timeSincePerch = 0;
                 perching = true;
@@ -253,27 +303,23 @@ public class Boid : MonoBehaviour
         checkGround();
         //ensures that boid gets tired some time within 25 to 100 seconds and starts landing. 
         timeUntilTired -= Time.deltaTime;
-        if (timeUntilTired <= 0f)
+        if(timeUntilTired <= 0f)
         {
             timeUntilTired = UnityEngine.Random.Range(25f, 100f);
             landing = true;
         }
         //fixed -- rotate to be along the velocity vector. Maybe slerp later to make it smoother. 
-        if (velocity.magnitude > 0)
-        {
-            transform.rotation = Quaternion.LookRotation(velocity);
-        }
+        transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(velocity), Time.deltaTime);
 
-        if (boidBody != null)
-        {
-            boidBody.flapFrequency = Mathf.Clamp(velocity.magnitude, 1.8f, 2.5f);
-            boidBody.tailFrequency = boidBody.flapFrequency * 2.0f / 1.8f;
-        }
+        boidBody.flapFrequency = Mathf.Clamp(velocity.magnitude, 1.8f, 5f);
+        boidBody.tailFrequency = boidBody.flapFrequency * 1.8f / 2.0f;
 
+        // Enable these features to visualize the vectors
         //Debug.DrawRay(transform.position, alignment, Color.blue);
         //Debug.DrawRay(transform.position, separation, Color.green);
         //Debug.DrawRay(transform.position, cohesion, Color.magenta);
         //Debug.DrawRay(transform.position, velocity, Color.yellow);
         //Debug.DrawRay(transform.position, toFood, Color.cyan);
+        //Debug.DrawRay(transform.position, avoidPredator, Color.red);
     }
 }

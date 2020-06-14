@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System;
 using UnityEngine;
 using BoidVision;
-//using Unity.Barracuda;
 
 public class HeartOfTheSwarm : MonoBehaviour
 {
     public GameObject boidPrefab;
-    //public GameObject CameraController;
     public int swarmCount;
     private int maxDistance = 45;
     private Vector3 origin;
@@ -21,14 +19,18 @@ public class HeartOfTheSwarm : MonoBehaviour
     int ImageDim = 416;
 
     [SerializeField]
-    float SampleFrequency = 0.1f; // How often we want the boid to capture an image
+    float SampleFrequency = 0.5f; // How often we want the boid to capture an image
 
     [SerializeField]
     string URL = "http://127.0.0.1:5000/getFromUnity";
 
+    [SerializeField]
+    bool UseCV;
+
     List<Tuple<GameObject, Camera, RenderTexture>> boidCamPairs = new List<Tuple<GameObject, Camera, RenderTexture>>();
     //CameraCapture captureManager;
     Camera currentCamera;
+    BoidVisionClient currentBoid;
     int CameraIndex;
     int PackageIndex;
 
@@ -50,40 +52,43 @@ public class HeartOfTheSwarm : MonoBehaviour
 
             RenderTexture rt = new RenderTexture(ImageDim, ImageDim, 24);
             Camera cam = boid.GetComponentInChildren<Camera>();
-
-            if (cam == null)
-                continue;
-
             cam.targetTexture = rt;
 
             // By passing the graphPB to the boid, it will automatically start running the CV model
             //boid.GetComponent<MLVisionController>().initializeModel(graph, ImageDim, ConfidenceThreshold, SampleFrequency, graphName, true);
-            boid.GetComponent<BoidVisionClient>().InitializeBoid(ImageDim, SampleFrequency, URL, true);
+            if (UseCV)
+                boid.GetComponent<BoidVisionClient>().InitializeBoid(ImageDim, SampleFrequency, URL, i, true);
 
             // Store to keep track of boids (maybe in future we can use it for debugging
             boidCamPairs.Add(new Tuple<GameObject, Camera, RenderTexture>(boid, cam, rt));
         }
 
         // Randomly select a boid from the boidCamPairs and choose one to be enabled for GUI
-        ChangeCamera();
+        if (UseCV)
+            ChangeCamera();
     }
 
     void ChangeCamera()
     {
-        if (boidCamPairs.Count == 0)
-            return;
-        CameraIndex = (++CameraIndex) % boidCamPairs.Count;
+        int temp = CameraIndex % boidCamPairs.Count;
         if (currentCamera)
+        {
             currentCamera.enabled = false;
+            currentBoid.CurrCameraActive = false;
+        }
 
-        currentCamera = boidCamPairs[CameraIndex].Item2;
+        currentCamera = boidCamPairs[temp].Item2;
+        currentBoid = boidCamPairs[temp].Item1.GetComponent<BoidVisionClient>();
+
         currentCamera.enabled = true;
-        Debug.Log("Currently using camera from boid " + boidCamPairs[CameraIndex].Item1.GetInstanceID());
+        currentBoid.CurrCameraActive = true;
+        Debug.Log("Currently using camera from boid " + boidCamPairs[temp].Item1.GetInstanceID());
+        CameraIndex++;
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.C))
+        if (Input.GetKeyDown(KeyCode.C) && UseCV)
         {
             ChangeCamera();
         }
